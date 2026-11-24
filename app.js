@@ -16,8 +16,12 @@ let pushSubscription;
 const pushPayload = () => ({id:deviceId,rules:state.rules,tasks:state.tasks});
 async function syncPush(){
   if(!pushSubscription) return;
-  try{ await fetch('./api/push/sync',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(pushPayload())}); }
-  catch(error){ console.warn('Could not sync push schedule',error); }
+  try{
+    const response=await fetch('./api/push/sync',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(pushPayload())});
+    if(!response.ok) throw new Error('Schedule sync failed.');
+    $('pushStatus').textContent='Lock-screen reminders synced. Times use India Standard Time.';
+  }
+  catch(error){ $('pushStatus').textContent='Reminders are saved on this device, but not synced for lock-screen alerts. Reconnect and enable alerts again.'; $('enablePush').disabled=false; }
 }
 async function enablePush(){
   const status=$('pushStatus');
@@ -65,8 +69,8 @@ function showTime(ms) { return new Date(ms).toLocaleTimeString('en-IN',{hour:'nu
 function changeTask(rule,date,done) {
   const now = Date.now();
   state.tasks[taskKey(rule,date)] = done
-    ? {done:now,title:rule.title,category:rule.category}
-    : {next:now + rule.interval * 60000};
+    ? {done:now,updated:now,title:rule.title,category:rule.category}
+    : {next:now + rule.interval * 60000,updated:now};
   persist();
   syncPush();
   render();
@@ -204,10 +208,12 @@ function tick(){
 render();
 tick();
 setInterval(tick,1000);
-document.addEventListener('visibilitychange',()=>{ if(!document.hidden) tick(); });
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden){tick();syncPush();} });
+window.addEventListener('online',syncPush);
 if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(console.warn);
 $('enablePush').onclick=enablePush;
 navigator.serviceWorker?.ready.then(async registration=>{
+  if(!registration.pushManager) return;
   pushSubscription=await registration.pushManager.getSubscription();
   if(pushSubscription){$('enablePush').textContent='Lock-screen alerts enabled';$('enablePush').disabled=true;$('pushStatus').textContent='Lock-screen alerts are enabled for this iPhone.';syncPush();}
-});
+}).catch(console.warn);

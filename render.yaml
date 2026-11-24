@@ -1,0 +1,26 @@
+# Always-on compute and a persistent disk incur Render charges.
+# Review Render's price before creating this Blueprint.
+services:
+  - type: web
+    name: lily-calendar
+    runtime: node
+    plan: starter
+    repo: https://github.com/vatsa2912/Lily-s-Calendar
+    branch: main
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    disk:
+      name: lily-data
+      mountPath: /var/data/lily
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATA_DIR
+        value: /var/data/lily
+      - key: TZ
+        value: Asia/Kolkata
+      - key: VAPID_SUBJECT
+        value: https://github.com/vatsa2912/Lily-s-Calendar
